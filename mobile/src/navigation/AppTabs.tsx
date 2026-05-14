@@ -1,6 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { ChatScreen } from '../screens/ChatScreen';
+import { ChatStack } from './ChatStack';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { colors } from '../theme/colors';
@@ -11,18 +11,16 @@ const Tab = createBottomTabNavigator<AppTabsParamList>();
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TAB_ICONS: Record<keyof AppTabsParamList, { active: IoniconsName; inactive: IoniconsName }> = {
-  Chat:      { active: 'chatbubble',        inactive: 'chatbubble-outline' },
-  Dashboard: { active: 'bar-chart',         inactive: 'bar-chart-outline' },
-  Profile:   { active: 'person-circle',     inactive: 'person-circle-outline' },
+  ChatStack:  { active: 'chatbubble',    inactive: 'chatbubble-outline' },
+  Dashboard:  { active: 'bar-chart',     inactive: 'bar-chart-outline' },
+  Profile:    { active: 'person-circle', inactive: 'person-circle-outline' },
 };
 
 export function AppTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerStyle: { backgroundColor: colors.primary },
-        headerTintColor: colors.textInverse,
-        headerTitleStyle: { fontWeight: 'bold' },
+        headerShown: false, // cada stack maneja su propio header
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: { borderTopColor: colors.border },
@@ -33,9 +31,9 @@ export function AppTabs() {
         },
       })}
     >
-      <Tab.Screen name="Chat"      component={ChatScreen}      options={{ title: 'Asesor IA' }} />
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Portfolio' }} />
-      <Tab.Screen name="Profile"   component={ProfileScreen}   options={{ title: 'Perfil' }} />
+      <Tab.Screen name="ChatStack"  component={ChatStack}       options={{ title: 'Asesor IA' }} />
+      <Tab.Screen name="Dashboard"  component={DashboardScreen} options={{ title: 'Portfolio' }} />
+      <Tab.Screen name="Profile"    component={ProfileScreen}   options={{ title: 'Perfil' }} />
     </Tab.Navigator>
   );
 }

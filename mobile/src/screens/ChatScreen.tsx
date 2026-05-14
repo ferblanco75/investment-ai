@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 import { colors } from '../theme/colors';
-import { AppTabsScreenProps } from '../navigation/types';
+import { ChatStackScreenProps } from '../navigation/types';
 
 interface ChatMessage {
   id: string;
@@ -30,64 +30,37 @@ const WELCOME: ChatMessage = {
   created_at: new Date().toISOString(),
 };
 
-export function ChatScreen(_props: AppTabsScreenProps<'Chat'>) {
+export function ChatScreen({ route }: ChatStackScreenProps<'Chat'>) {
+  const { conversationId } = route.params;
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
-    if (user) loadOrCreateConversation();
-  }, [user]);
+    loadHistory();
+  }, [conversationId]);
 
-  const loadOrCreateConversation = async () => {
+  const loadHistory = async () => {
     setLoadingHistory(true);
-    try {
-      const { data: conv } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('user_id', user!.id)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
+    const { data: msgs } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(50);
 
-      let activeId = conv?.id;
-
-      if (!activeId) {
-        const { data: newConv } = await supabase
-          .from('conversations')
-          .insert({ user_id: user!.id, title: 'Nueva conversación' })
-          .select('id')
-          .single();
-        activeId = newConv?.id;
-      }
-
-      if (!activeId) return;
-      setConversationId(activeId);
-
-      const { data: msgs } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', activeId)
-        .order('created_at', { ascending: true })
-        .limit(50);
-
-      if (msgs && msgs.length > 0) {
-        setMessages(msgs as ChatMessage[]);
-      }
-    } finally {
-      setLoadingHistory(false);
-    }
+    setMessages(msgs && msgs.length > 0 ? (msgs as ChatMessage[]) : [WELCOME]);
+    setLoadingHistory(false);
   };
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
-    if (!text || !user || !conversationId || isTyping) return;
+    if (!text || !user || isTyping) return;
 
     setInput('');
 
@@ -98,37 +71,22 @@ export function ChatScreen(_props: AppTabsScreenProps<'Chat'>) {
       created_at: new Date().toISOString(),
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev.filter(m => m.id !== 'welcome'), userMsg]);
     setIsTyping(true);
 
     try {
-      await supabase.from('messages').insert({
-        conversation_id: conversationId,
-        user_id: user.id,
-        role: 'user',
-        content: text,
-      });
-
       const { data, error } = await supabase.functions.invoke('chat', {
         body: { message: text, conversation_id: conversationId },
       });
 
       if (error) throw error;
 
-      const botMsg: ChatMessage = {
+      setMessages(prev => [...prev, {
         id: data.message_id ?? `bot-${Date.now()}`,
         role: 'assistant',
         content: data.reply,
         created_at: new Date().toISOString(),
-      };
-
-      setMessages(prev => [...prev, botMsg]);
-
-      await supabase
-        .from('conversations')
-        .update({ title: text.slice(0, 60), updated_at: new Date().toISOString() })
-        .eq('id', conversationId);
-
+      }]);
     } catch {
       setMessages(prev => [...prev, {
         id: `err-${Date.now()}`,
@@ -217,30 +175,30 @@ export function ChatScreen(_props: AppTabsScreenProps<'Chat'>) {
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: colors.background },
-  loading:         { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: colors.background },
-  loadingText:     { color: colors.textSecondary },
-  list:            { padding: 16, gap: 12 },
+  container:        { flex: 1, backgroundColor: colors.background },
+  loading:          { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: colors.background },
+  loadingText:      { color: colors.textSecondary },
+  list:             { padding: 16, gap: 12 },
 
-  messageRow:      { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  messageRowUser:  { justifyContent: 'flex-end' },
-  messageRowBot:   { justifyContent: 'flex-start' },
+  messageRow:       { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  messageRowUser:   { justifyContent: 'flex-end' },
+  messageRowBot:    { justifyContent: 'flex-start' },
 
-  avatarContainer: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' },
-  avatarEmoji:     { fontSize: 18 },
+  avatarContainer:  { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  avatarEmoji:      { fontSize: 18 },
 
-  bubble:          { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleUser:      { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
-  bubbleBot:       { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
-  typingBubble:    { paddingVertical: 12, paddingHorizontal: 16 },
+  bubble:           { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+  bubbleUser:       { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
+  bubbleBot:        { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4 },
+  typingBubble:     { paddingVertical: 12, paddingHorizontal: 16 },
 
-  textUser:        { color: colors.textInverse, fontSize: 15, lineHeight: 21 },
-  textBot:         { color: colors.textPrimary, fontSize: 15, lineHeight: 21 },
+  textUser:         { color: colors.textInverse, fontSize: 15, lineHeight: 21 },
+  textBot:          { color: colors.textPrimary, fontSize: 15, lineHeight: 21 },
 
-  typingRow:       { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
+  typingRow:        { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
 
-  inputBar:        { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
-  input:           { flex: 1, minHeight: 40, maxHeight: 120, fontSize: 15, color: colors.textPrimary, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.background, borderRadius: 20, borderWidth: 1, borderColor: colors.border },
-  sendButton:      { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+  inputBar:         { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+  input:            { flex: 1, minHeight: 40, maxHeight: 120, fontSize: 15, color: colors.textPrimary, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.background, borderRadius: 20, borderWidth: 1, borderColor: colors.border },
+  sendButton:       { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   sendButtonDisabled: { backgroundColor: colors.border },
 });

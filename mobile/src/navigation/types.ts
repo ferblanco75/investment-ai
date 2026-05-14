@@ -6,14 +6,23 @@ export type AuthStackParamList = {
   Register: undefined;
 };
 
+// Stack dentro del tab Chat
+export type ChatStackParamList = {
+  ConversationsList: undefined;
+  Chat: { conversationId: string; title?: string };
+};
+
 export type AppTabsParamList = {
-  Chat: undefined;
+  ChatStack: undefined;
   Dashboard: undefined;
   Profile: undefined;
 };
 
 export type AuthStackScreenProps<T extends keyof AuthStackParamList> =
   NativeStackScreenProps<AuthStackParamList, T>;
+
+export type ChatStackScreenProps<T extends keyof ChatStackParamList> =
+  NativeStackScreenProps<ChatStackParamList, T>;
 
 export type AppTabsScreenProps<T extends keyof AppTabsParamList> =
   BottomTabScreenProps<AppTabsParamList, T>;
